@@ -1,0 +1,38 @@
+#!/bin/bash
+
+# dib-lint: disable=safe_sudo
+
+if [ ${DIB_DEBUG_TRACE:-0} -gt 0 ]; then
+    set -x
+fi
+set -eu
+set -o pipefail
+
+[ -n "$IMAGE_BLOCK_DEVICE" ] || die "Image block device not set"
+
+sudo parted -a optimal -s $IMAGE_BLOCK_DEVICE \
+    mklabel msdos \
+    mkpart primary ext4 1MB 200MB \
+    mkpart primary xfs 200MB 1900MB \
+    mkpart primary xfs 1900MB 2100MB \
+    mkpart extended 2100MB 100% \
+    mkpart logical linux-swap 2100MB 2150MB \
+    mkpart logical xfs 2150MB 2200MB \
+    mkpart logical xfs 2200MB 100% \
+    set 1 boot on
+
+sudo partprobe $IMAGE_BLOCK_DEVICE
+
+# To ensure no race conditions exist from calling partprobe
+sudo udevadm settle
+sudo kpartx -alsv $TMP_IMAGE_PATH
+
+# create filesystems on partitions
+mkfs.ext4 ${IMAGE_BLOCK_DEVICE}p1
+for p in 3 6 7; do
+    mkfs.xfs -f ${IMAGE_BLOCK_DEVICE}p$p
+done
+mkswap ${IMAGE_BLOCK_DEVICE}p5
+
+echo "IMAGE_BLOCK_DEVICE=${IMAGE_BLOCK_DEVICE}p2"
+

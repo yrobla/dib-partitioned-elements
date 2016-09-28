@@ -1,0 +1,53 @@
+# mount extra partitions and move content
+WORKING=$(mktemp -d)
+mkdir $WORKING/mnt/
+mkdir $WORKING/mnt/root
+mkdir $WORKING/mnt/boot
+mkdir $WORKING/mnt/var
+
+# image block device has partition on it, so we need to strip the last 2 chars
+RAW_DEVICE=${IMAGE_BLOCK_DEVICE::-2}
+
+sudo mount ${RAW_DEVICE}p2 $WORKING/mnt/root
+sudo mount ${RAW_DEVICE}p1 $WORKING/mnt/boot
+sudo mount ${RAW_DEVICE}p7 $WORKING/mnt/var
+sudo mv $WORKING/mnt/root/boot/* $WORKING/mnt/boot/
+sudo mv $WORKING/mnt/root/var/* $WORKING/mnt/var/
+
+# TODO: tidy-logs needs /var/log to exist and be
+# on root partition
+mkdir -p $WORKING/mnt/root/var/log
+
+# update /etc/fstab to mount new partitions
+# create /etc/fstab
+cat > $WORKING/mnt/root/etc/fstab <<EOF
+#
+# /etc/fstab
+# Created by $(basename $0) on $(date)
+#
+# Accessible filesystems, by reference, are maintained under '/dev/disk'
+# See man pages fstab(5), findfs(8), mount(8) and/or blkid(8) for more info
+#
+EOF
+declare -A MOUNTS=( [2]="/" [1]="/boot" [3]="/tmp" [6]="/home" [7]="/var" )
+for m in "${!MOUNTS[@]}"; do
+        UUID=$(blkid ${RAW_DEVICE}p$m -o value -s UUID)
+
+        echo "UUID=$UUID        ${MOUNTS[$m]}   xfs     defaults        0 0" >> $WORKING/mnt/root/etc/fstab
+
+        # get the boot uuid
+        if [ ${MOUNTS[$m]} == '/boot' ]; then
+            BOOT_UUID=$UUID
+        fi
+done
+UUID=$(blkid ${RAW_DEVICE}p5 -o value -s UUID)
+echo "UUID=$UUID        swap    swap    defaults        0 0" >> $WORKING/mnt/root/etc/fstab
+
+# umount all partitions
+sudo umount $WORKING/mnt/root
+sudo umount $WORKING/mnt/boot
+sudo umount $WORKING/mnt/var
+
+# update uuids in grub
+sed -i.bak -e "s/LABEL=${DIB_ROOT_LABEL}/UUID=$BOOT_UUID/g" $TMPDIR/image_repartitioned/boot/grub2/grub.cfg
+
