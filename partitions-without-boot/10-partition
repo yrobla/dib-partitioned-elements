@@ -1,0 +1,50 @@
+#!/bin/bash
+
+# dib-lint: disable=safe_sudo
+
+if [ ${DIB_DEBUG_TRACE:-0} -gt 0 ]; then
+    set -x
+fi
+set -eu
+set -o pipefail
+
+[ -n "$IMAGE_BLOCK_DEVICE" ] || die "Image block device not set"
+
+sudo parted -a optimal -s $IMAGE_BLOCK_DEVICE \
+    mklabel msdos \
+    mkpart primary 1MiB 2100MB \
+    mkpart primary 2100MB 2300MB \
+    mkpart extended 2300MB 100% \
+    mkpart logical linux-swap 2300MB 2350MB \
+    mkpart logical xfs 2350MB 2450MB \
+    mkpart logical xfs 2450MB 100% \
+    set 1 boot on
+
+sudo partprobe $IMAGE_BLOCK_DEVICE
+
+# To ensure no race conditions exist from calling partprobe
+sudo udevadm settle
+
+# If the partition isn't under /dev/loop*p1, create it with kpartx
+DM=
+if [ ! -e "${IMAGE_BLOCK_DEVICE}p1" ]; then
+    DM=${IMAGE_BLOCK_DEVICE/#\/dev/\/dev\/mapper}
+    # If running inside Docker, make our nodes manually, because udev will not be working.
+    if [ -f /.dockerenv ]; then
+        # kpartx cannot run in sync mode in docker.
+        sudo kpartx -av $TMP_IMAGE_PATH
+        sudo dmsetup --noudevsync mknodes
+    else
+        sudo kpartx -asv $TMP_IMAGE_PATH
+    fi
+elif [[ "$ARCH" =~ "ppc" ]]; then
+    sudo kpartx -asv $TMP_IMAGE_PATH
+fi
+
+# create filesystem on partitions
+sudo mkfs.xfs -f ${IMAGE_BLOCK_DEVICE}p2
+sudo mkfs.xfs -f ${IMAGE_BLOCK_DEVICE}p6
+sudo mkfs.xfs -f ${IMAGE_BLOCK_DEVICE}p7
+sudo mkswap ${IMAGE_BLOCK_DEVICE}p5
+
+echo "IMAGE_BLOCK_DEVICE=${IMAGE_BLOCK_DEVICE}p1"

@@ -1,0 +1,26 @@
+#!/bin/bash
+
+if [ ${DIB_DEBUG_TRACE:-1} -gt 0 ]; then
+    set -x
+fi
+set -eu
+set -o pipefail
+
+if [ $DISTRO_NAME = 'opensuse' ] ; then
+    # workaround for https://bugzilla.novell.com/show_bug.cgi?id=859493
+    rm -f /dev/mapper/loop*_part1
+fi
+[root@nfvsdn-10 partitions-without-boot]# ^C
+[root@nfvsdn-10 partitions-without-boot]# cat finalise.d/50-remove-bogus-udev-links 
+#!/bin/bash
+
+if [ ${DIB_DEBUG_TRACE:-1} -gt 0 ]; then
+    set -x
+fi
+set -eu
+set -o pipefail
+
+if [ $DISTRO_NAME = 'opensuse' ] ; then
+    # workaround for https://bugzilla.novell.com/show_bug.cgi?id=859493
+    rm -f /dev/mapper/loop*_part1
+fi
