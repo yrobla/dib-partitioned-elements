@@ -12,12 +12,13 @@ set -o pipefail
 
 sudo parted -a optimal -s $IMAGE_BLOCK_DEVICE \
     mklabel msdos \
-    mkpart primary 1MiB 2100MB \
-    mkpart primary 2100MB 2300MB \
-    mkpart extended 2300MB 100% \
-    mkpart logical linux-swap 2300MB 2350MB \
-    mkpart logical xfs 2350MB 2450MB \
-    mkpart logical xfs 2450MB 100% \
+    mkpart primary 1MiB 5000MB \
+    mkpart primary 5000MB 5550MB \
+    mkpart primary 5550MB 5600MB \
+    mkpart extended 6000MB 100% \
+    mkpart logical linux-swap 6000MB 6150MB \
+    mkpart logical xfs 6150MB 6550MB \
+    mkpart logical xfs 6550MB 100% \
     set 1 boot on
 
 sudo partprobe $IMAGE_BLOCK_DEVICE
@@ -43,8 +44,14 @@ fi
 
 # create filesystem on partitions
 sudo mkfs.xfs -f ${IMAGE_BLOCK_DEVICE}p2
-sudo mkfs.xfs -f ${IMAGE_BLOCK_DEVICE}p6
 sudo mkfs.xfs -f ${IMAGE_BLOCK_DEVICE}p7
-sudo mkswap ${IMAGE_BLOCK_DEVICE}p5
+sudo mkfs.xfs -f ${IMAGE_BLOCK_DEVICE}p8
+
+# create labeled partition for config drive
+sudo mkfs.xfs -f ${IMAGE_BLOCK_DEVICE}p3 -L config-2
+
+# create swap
+sudo mkswap ${IMAGE_BLOCK_DEVICE}p6
 
 echo "IMAGE_BLOCK_DEVICE=${IMAGE_BLOCK_DEVICE}p1"
+

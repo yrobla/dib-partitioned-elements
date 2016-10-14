@@ -26,7 +26,7 @@ cat > $WORKING/mnt/root/etc/fstab <<EOF
 # See man pages fstab(5), findfs(8), mount(8) and/or blkid(8) for more info
 #
 EOF
-declare -A MOUNTS=( [1]="/" [2]="/tmp" [6]="/home" [7]="/var")
+declare -A MOUNTS=( [1]="/" [2]="/tmp" [7]="/home" [8]="/var")
 for m in "${!MOUNTS[@]}"; do
         UUID=$(blkid ${RAW_DEVICE}p$m -o value -s UUID)
 
@@ -38,9 +38,10 @@ for m in "${!MOUNTS[@]}"; do
 
         echo "UUID=$UUID        ${MOUNTS[$m]}   $FS     defaults        0 0" >> $WORKING/mnt/root/etc/fstab
 done
-UUID=$(blkid ${RAW_DEVICE}p5 -o value -s UUID)
+UUID=$(blkid ${RAW_DEVICE}p6 -o value -s UUID)
 echo "UUID=$UUID        swap    swap    defaults        0 0" >> $WORKING/mnt/root/etc/fstab
 
 # umount all partitions
 sudo umount $WORKING/mnt/root
 sudo umount $WORKING/mnt/var
+
